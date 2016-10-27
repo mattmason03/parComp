@@ -1,3 +1,5 @@
 hw1/.vagrant/
 hw1/Vagrantfile
 *.bin
+inputs
+*.zip

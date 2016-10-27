@@ -1,0 +1,40 @@
+TO RUN:
+
+sudo apt-get install g++
+make parallel
+./par.out <inputfile> <nodenumber>
+
+APPROACH
+
+I wanted to create an implementation of BFS without using any locks on data, only control flow related (barrier).
+The general idea of the algorithm is to partition the nodes at each level of depth between threads, and barrier
+before moving to the next depth level.
+
+Interesting parts of my implementation:
+
+1. Don't lock when reading / writing level, as it's a benign data race
+    - multiple threads can update and it will still have the correct value
+    - extra vertices may be added to the bfs 'queue', but it won't change the result
+
+2. No locking to share data
+    - Double buffer: for each loop, have a read buffer and a write buffer.  Once all work is completed, swap buffers.
+    - Private 'channels' for thread communication, i.e. each thread has #-of-threads read & write channels.
+      I stored these channels in my buffer arrays with the scheme 'row' writes to 'column', i.e. with 2 threads, for index 0 thread 0 writes to thread 0,
+      index 1 thread 0 writes to thread 1, index 2 thread 1 writes to thread 0, index 3 thread 1 writes to thread 1 (as shown below)
+            Read 
+   Thread 0       1
+Write 0  00      01
+   
+      1  10      11
+
+3. Minimize allocations & copies
+    - Reuse vectors in buffers to minimize allocations
+    - Vector swap just exchanges data pointer, so buffer swap is cheap (and channel data is swapped for free, while maintaining same vector reference)
+
+4. Minimize false sharing (perhaps overkill?)
+    - I was worried that a tight array of vectors could cause false sharing due to size updates (as well as data & capacity, but less so).
+      Created cache_safe_vec, which is a struct with a vector and padding to fill a cache line, so that I could fill by double buffers with these
+
+5. Work partitioning: modulus on vertex id and push to that thread channel.  Cheap if thread_count is power of 2, and the work distribution should
+   be relatively even due to the random nature of the graph.  Considered using a different structure from the hash table to improve locality,
+   if I had a vector of vertex -> edges I could partition the vector and hope that data locality is a bit better.

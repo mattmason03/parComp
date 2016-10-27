@@ -1,0 +1,12 @@
+TO RUN:
+
+sudo apt-get install g++
+make parallel
+./par.out <inputfile>
+
+Output will be stored in par.txt file.
+
+APPROACH
+
+I decided to go with a simple work partitioning scheme that would require no synchronization.
+I partitioned the input matrix by rows and partitioned the output matrix by rows.

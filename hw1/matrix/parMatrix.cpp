@@ -63,33 +63,41 @@ int main(int argc, char** argv) {
   FILE *in_file = fopen(argv[1], "r");
   FILE *out_file = fopen("par.txt", "w+");
 
+  // determine cpu count dynamically
   int CPUS = sysconf(_SC_NPROCESSORS_ONLN);
 
   int x, y;
   fscanf(in_file, "%d,%d\n", &x, &y);
 
+  // load matrices
   matrix a = load_matrix(in_file, x, y);
   matrix b = load_matrix(in_file, y, 1);
-
-  int rows_per_thread = x / CPUS;
 
   pthread_t *threads = new pthread_t[CPUS];
   mat_mult *inputs = new mat_mult[CPUS];
 
   matrix r = { x, 1, new int[x] };
 
+  // partition based on rows in matrix a
+  // determine how many rows to give to each thread
+  int rows_per_thread = x / CPUS;
+  // determine the number of elements to give to each thread
   int array_step = rows_per_thread * a.y;
 
   for (int i = 0; i < CPUS; i++)
   {
     int rows = rows_per_thread;
+    // handle the end case
     if (i + 1 == CPUS) {
       rows = a.x - rows_per_thread * i;
     }
 
     mat_mult &in = inputs[i];
+    // partition matrix a
     in.a = { rows, a.y, a.d + array_step * i };
+    // always use whole vector
     in.b = b;
+    // partition result matrix
     in.r = { rows, 1, r.d + rows_per_thread * i };
 
     pthread_create(&threads[i], NULL, &multiply_matrix, &in);
